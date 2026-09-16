@@ -270,7 +270,7 @@ legend("topright", legend = names(comp_colors), col = comp_colors,
 
 ---------------------------------------------------------------------------
 
-"Something has gone wrong! I hate R spatial! What’s happening!?"
+"Something has gone wrong! I hate R-Spatial! What’s happening!?"
 
 -   **Things are not in the same coordinate reference system.** You might have read in your data in the wrong CRS. Or one data source might be in a lat/lon CRS, and the other might be in a projected CRS with units in meters.
 
@@ -282,7 +282,7 @@ legend("topright", legend = names(comp_colors), col = comp_colors,
 
 -   **The visualization package you’ve chosen does not do that.** Have you spent two hours trying to change the font on your legend title in `tmap`? Sadly, `tmap` may just not have that graphic functionality, and you may need to try one of the many other visualization packages: `ggmap`, `leaflet`, `mapview`, etc.
 
--   **Something outside of R is broken or disconnected.** You can’t load in an OpenStreetMap basemap because Wright’s RStudio isn’t playing nice with Java today. Or somebody needs to update a package on the VACC. Or Google Earth Engine’s API is down. This is the hardest type of error to understand and address, and I typically either try again the next day and it’s fine, or I give up and figure out a different way to do that thing without using the external broken piece.
+-   **Something outside of R is broken or disconnected.** You can’t load in an OpenStreetMap basemap because RStudio isn’t playing nice with Java today. Or somebody needs to update a package on the VACC. Or Google Earth Engine’s API is down. This is the hardest type of error to understand and address, and I typically either try again the next day and it’s fine, or I give up and figure out a different way to do that thing without using the external broken piece.
 
 ### Resources
 
