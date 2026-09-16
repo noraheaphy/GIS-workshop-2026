@@ -237,7 +237,8 @@ What is the relationship between ancestry and environment?
 predictions <- read.csv("preds_DRmod_Eref.csv")[,-1]
 
 # housekeeping
-new_data <- data.frame(Eref = seq(min(data_df$Eref), max(data_df$Eref), length.out = 100))
+new_data <- data.frame(Eref = seq(min(data_df$Eref, na.rm = TRUE),
+            max(data_df$Eref, na.rm = TRUE), length.out = 100))
 comp_names <- c("q_BSwest", "q_BSmideast", "q_RS")
 data_df <- data_df %>% filter(sample_id != "SNL1")
 Y <- data_df[, comp_names]
