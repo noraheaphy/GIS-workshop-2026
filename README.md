@@ -1,2 +1,284 @@
-# GIS-workshop-2026
-Keller lab - GIS workshop - Fall 2026
+# GIS workshop
+
+## Basic R spatial workflow
+
+### **Spatial set-up**
+
+```{r message=FALSE}
+
+# load packages
+library(sf) # vector data
+library(terra) # raster data
+library(tmap) # visualization
+library(tidyverse) # data management & cleaning
+library(tidyterra) # spatial data management & cleaning
+library(conStruct) # population genetic structure visualization
+
+# read in point data
+data <- read.csv("RS_BS_data.csv")
+
+# turn dataframe into spatial object in WGS84
+data_pts <- st_as_sf(data, coords = c("lon", "lat"), crs = 4326)
+
+# check out the difference in how R understands a spatial object
+str(data)
+str(data_pts)
+
+# read in polygons of RS and BS ranges
+RS_range <- read_sf("picea_rubens_range_shp/picerube.shp")
+BS_range <- read_sf("picea_mariana_range_shp/picemari.shp")
+
+# take a quick look at one of these
+plot(BS_range[,6])
+str(BS_range)
+
+```
+
+Important: You need to know existing CRS here when turning the dataframe into a spatial object--this is what projection the data is already in, not what projection you want it to be in. Also, note that longitude is x, and latitutde is y. The CRS in this command can be set equal to an EPSG code (4326) or a PROJ string, which looks something like: `+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0`
+
+More info here: <https://inbo.github.io/tutorials/tutorials/spatial_crs_coding/>
+
+### **Extract raster values to points**
+
+```{r}
+
+# check out the CRS
+st_crs(data_pts)
+st_crs(RS_range)
+
+# project spatial points into new CRS (NAD83)
+data_proj <- st_transform(data_pts, crs = st_crs(4269)) # another EPSG code
+
+# convert ranges to same CRS as points
+RS_proj <- st_transform(RS_range, crs = st_crs(data_proj))
+BS_proj <- st_transform(BS_range, crs = st_crs(data_proj))
+
+# read in rasters of future climate variables for 2071-2100, SSP2-45
+raster_files <- list.files(path = "climate_data", 
+								full.names = TRUE)
+raster_stack <- rast(raster_files)
+raster_stack
+plot(raster_stack$Eref)
+
+# project raster_stack to match the CRS of the points
+raster_stack_proj <- project(raster_stack, crs(data_proj))
+
+# extract raster values to points
+values <- terra::extract(raster_stack_proj, data_proj)
+# Note: both terra (new) and raster (old) packages have an extract function.
+# If you have both packages installed, you may have to specify.
+
+# attach extracted values to original data
+data_extract <- cbind(data_proj, values[,-1])
+
+```
+
+This will output a dataframe with the `data_proj` coordinate data plus columns for each climate variable in `raster_stack` with the values at those coordinates.
+
+### **Make a map**
+
+```{r}
+
+# read in shapefile for map
+n_america <- read_sf("north_america_shp/bound_p.shp")
+
+# project polygons into new CRS (NAD83)
+n_america_proj <- st_transform(n_america, crs = st_crs(4269))
+
+# you can specify a lat/lon box to crop it with for visualization
+bbox_polygon <- st_polygon(list(rbind(c(-170, 24), c(-170, 72), c(-52, 72), c(-52, 24), c(-170, 24))))
+bbox_sf <- st_sf(geometry = st_sfc(bbox_polygon, crs = 4326))
+
+# make a basic map looking at points
+tm_shape(n_america_proj, bbox = bbox_sf) + 
+  tm_polygons(fill = "lightgrey", col = "white") +
+  tm_shape(BS_proj) +
+  tm_polygons(fill = "grey70", col = "black", lwd = 0.5) +
+  tm_shape(RS_proj) +
+  tm_polygons(fill = "#b17474", col = "black", lwd = 0.5) +
+  tm_shape(data_proj) +
+  tm_dots(shape = 21, size = 0.4, fill = "#fcd06f")
+
+
+```
+
+### **Make some nicer maps**
+
+```{r}
+
+# let's first take a look at population genetic structure
+
+# housekeeping for the map
+pop_order <- c("BS_west", "BS_mideast", "BS_introg", "RS_introg", "RS_pure")
+pop_labels <- c(BS_west = "western BS", BS_mideast = "central/eastern BS",
+                 BS_introg = "introgressed BS", RS_introg = "introgressed RS",
+                 RS_pure = "pure RS")
+cluster_labels <- c(q_BSwest = "western BS", q_BSmideast = "central/eastern BS", q_RS = "RS")
+
+# convert the data to long format for visualization
+data_long <- data %>%
+  mutate(pop = factor(pop, levels = pop_order)) %>%
+  arrange(pop, lon) %>%
+  mutate(sample_id = factor(sample_id, levels = unique(sample_id))) %>%
+  pivot_longer(cols = starts_with("q_"),
+               names_to = "cluster", values_to = "q")
+
+ggplot(data_long, aes(x = sample_id, y = q, fill = cluster)) +
+  geom_col(width = 1) +
+  facet_grid(~ pop, scales = "free_x", space = "free_x",
+             labeller = labeller(pop = pop_labels)) +
+  scale_fill_manual(values = c("q_BSwest" = "#1b9e77", 
+                    "q_BSmideast" = "#eb983f", "q_RS" = "#7570b3"),
+                    labels = cluster_labels) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.spacing = unit(0.1, "lines"),
+        strip.text = element_text(angle = 90, size = 8)) +
+  labs(x = NULL, y = "Ancestry proportion", fill = "Cluster")
+
+```
+
+```{r}
+
+# map majority population structure categories
+tm_shape(n_america_proj, bbox = bbox_sf) + 
+  tm_polygons(fill = "lightgrey", col = "white") +
+  tm_shape(data_proj) +
+  tm_dots(shape = 21, size = 0.5, fill = "pop",
+          fill.scale = tm_scale_categorical(
+          values = c("#a17d28", "#28a19d", "#5c28a1", "#f2d518", "#bd3333")))
+
+```
+
+```{r}
+
+# map pie charts showing ancestry
+
+# install.packages("scatterpie") 
+# sorry I did not ask you to do this in advance but should be fairly pain-free
+library(scatterpie)
+
+# turn spatial object back into regular dataframe
+data_df <- data_extract %>%
+  st_drop_geometry() %>%
+  mutate(lon = st_coordinates(data_proj)[,1],
+         lat = st_coordinates(data_proj)[,2])
+
+# reshape into wide format for plotting
+pie_data <- data_df %>%
+  select(sample_id, lon, lat, q_BSwest, q_BSmideast, q_RS, locality)
+
+# average ancestry for individuals very close together
+pie_data <- pie_data %>%
+  group_by(locality, lon, lat) %>%
+  summarise(across(c(q_BSwest, q_BSmideast, q_RS), mean), .groups = "drop")
+
+# make your bounding box parsable to ggplot
+bb <- st_bbox(bbox_sf)
+
+# make a snazzy map
+ggplot() +
+  geom_sf(data = n_america, fill = "lightgrey", col = "white") +
+  geom_scatterpie(data = pie_data, aes(x = lon, y = lat, group = locality),
+                   cols = c("q_BSwest", "q_BSmideast", "q_RS"),
+                   pie_scale = 0.6, color = "black", linewidth = 0.2) +
+  scale_fill_manual(values = c(q_BSwest = "#1b9e77",
+                                q_BSmideast = "#eb983f",
+                                q_RS = "#7570b3"),
+                     labels = cluster_labels) +
+  coord_sf(xlim = bb[c("xmin","xmax")], ylim = bb[c("ymin","ymax")]) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    text = element_text(family = "sans", color = "black"),
+    axis.text = element_text(family = "sans", color = "black"),
+    axis.title = element_text(family = "sans", color = "black"),
+    legend.position = c(0.15, 0.25),
+    legend.background = element_blank(),
+    legend.title = element_text(margin = margin(b = 15)),
+    legend.key = element_blank()) +
+  labs(fill = "Ancestry group")
+
+```
+
+Why are the pie charts slightly warped and not entirely circular?
+
+### **Spatial Analysis**
+
+What is the relationship between ancestry and environment?
+
+```{r, suppress}
+
+# Some modeling code you can run optionally
+# install.packages("DirichletReg")
+# library(DirichletReg)
+# data_df <- data_df %>% filter(sample_id != "SNL1")
+# data_DR <- DR_data(data_df[, 3:5])
+# DR_model <- DirichReg(data_DR ~ Eref, data_df)
+# new_data <- data.frame(Eref = seq(min(data_df$Eref), max(data_df$Eref), length.out = 100))
+# predictions <- predict(DR_model, new_data)
+# write.csv(predictions, "preds_DRmod_Eref.csv")
+
+# read in predictions from the model
+predictions <- read.csv("preds_DRmod_Eref.csv")[,-1]
+
+# housekeeping
+new_data <- data.frame(Eref = seq(min(data_df$Eref), max(data_df$Eref), length.out = 100))
+comp_names <- c("q_BSwest", "q_BSmideast", "q_RS")
+data_df <- data_df %>% filter(sample_id != "SNL1")
+Y <- data_df[, comp_names]
+colnames(predictions) <- comp_names
+comp_colors <- c(q_BSwest = "#1b9e77", q_BSmideast = "#eb983f",
+                 q_RS = "#7570b3")
+
+# color each point by its primary ancestry group
+dominant <- comp_names[max.col(Y)]
+point_col <- comp_colors[sub("avg_", "", dominant)]
+
+
+### RUN THESE LINES ALL TOGETHER OR YOU WILL GET AN ERROR
+plot(data_df$Eref, Y[, "q_RS"], type = "n",
+     xlab = "Evapotranspiration (mm)",
+     ylab = "Proportion of Ancestry",
+     ylim = c(0, 1))
+for (comp in comp_names) {
+  points(data_df$Eref, Y[, comp], pch = 21, bg = comp_colors[comp], 
+         col = comp_colors[comp])
+  lines(new_data$Eref, predictions[, comp], col = comp_colors[comp], lwd = 2)
+}
+legend("topright", legend = names(comp_colors), col = comp_colors,
+       pt.bg = comp_colors, lwd = 2, pch = 21, bty = "n")
+####
+
+```
+
+---------------------------------------------------------------------------
+
+"Something has gone wrong! I hate R spatial! What’s happening!?"
+
+-   **Things are not in the same coordinate reference system.** You might have read in your data in the wrong CRS. Or one data source might be in a lat/lon CRS, and the other might be in a projected CRS with units in meters.
+
+-   **Those points are in the ocean.** If you extracted raster values for a bunch of points and some came back with NA values, those points may be outside the raster extent or actually located in a body of water (i.e. no raster value for soil density). If you are so sure that tree is actually on an island in the middle of the lake, you either have a CRS issue causing the tree point to be slightly offset to its actual location relative to the raster, or your raster just doesn’t have that kind of resolution to have values for a tiny island, or your point doesn’t have sufficient coordinate precision (centroid of a 1 km pixel).
+
+-   **You’ve switched latitude and longitude.** Don’t forget that longitude is x, and latitude is y. Or one of them is missing a negative sign because the original data source specified longitude as 72 W instead of -72. Or latitude and longitude were written in degrees minutes seconds notation instead of decimal notation in the original data source.
+
+-   **You’re having package conflicts.** For example, the new package `terra` has a `mask` function that conflicts with the old package `raster`, which has a function with the same name. In this case, detach the old package or specify which package you want: `terra::mask()`.
+
+-   **The visualization package you’ve chosen does not do that.** Have you spent two hours trying to change the font on your legend title in `tmap`? Sadly, `tmap` may just not have that graphic functionality, and you may need to try one of the many other visualization packages: `ggmap`, `leaflet`, `mapview`, etc.
+
+-   **Something outside of R is broken or disconnected.** You can’t load in an OpenStreetMap basemap because Wright’s RStudio isn’t playing nice with Java today. Or somebody needs to update a package on the VACC. Or Google Earth Engine’s API is down. This is the hardest type of error to understand and address, and I typically either try again the next day and it’s fine, or I give up and figure out a different way to do that thing without using the external broken piece.
+
+### Resources
+
+-   [Geocomputation with R](https://r.geocompx.org/adv-map)
+
+-   [Spatial Statistics for Data Science: Theory and Practice with R](https://www.paulamoraga.com/book-spatial/index.html)
+
+-   [Intro to GIS and Spatial Analysis](https://mgimond.github.io/Spatial/index.html) (both ArcGIS Pro and R)
+
+-   [CRAN Task View: Analysis of Spatial Data](https://cran.r-project.org/web/views/Spatial.html)
+
+-   [Milos Popovic’s blog on data viz in R](https://milospopovic.net/blog)
