@@ -77,6 +77,8 @@ data_extract <- cbind(data_proj, values[,-1])
 
 This will output a dataframe with the `data_proj` coordinate data plus columns for each climate variable in `raster_stack` with the values at those coordinates.
 
+![Eref](https://github.com/noraheaphy/GIS-workshop-2026/blob/main/pics/Eref.png)
+
 ### **Make a map**
 
 ```{r}
@@ -103,6 +105,8 @@ tm_shape(n_america_proj, bbox = bbox_sf) +
 
 
 ```
+
+![Basic map](https://github.com/noraheaphy/GIS-workshop-2026/blob/main/pics/ranges_points.png)
 
 ### **Make some nicer maps**
 
@@ -140,6 +144,7 @@ ggplot(data_long, aes(x = sample_id, y = q, fill = cluster)) +
   labs(x = NULL, y = "Ancestry proportion", fill = "Cluster")
 
 ```
+![Structure barplot](https://github.com/noraheaphy/GIS-workshop-2026/blob/main/pics/structure_barplot.png)
 
 ```{r}
 
@@ -152,6 +157,8 @@ tm_shape(n_america_proj, bbox = bbox_sf) +
           values = c("#a17d28", "#28a19d", "#5c28a1", "#f2d518", "#bd3333")))
 
 ```
+
+![Pop groups](https://github.com/noraheaphy/GIS-workshop-2026/blob/main/pics/pop_groups.png)
 
 ```{r}
 
@@ -206,6 +213,8 @@ ggplot() +
 
 ```
 
+![Pie charts](https://github.com/noraheaphy/GIS-workshop-2026/blob/main/pics/pie_charts.png)
+
 Why are the pie charts slightly warped and not entirely circular?
 
 ### **Spatial Analysis**
@@ -256,6 +265,8 @@ legend("topright", legend = names(comp_colors), col = comp_colors,
 ####
 
 ```
+
+![DR model](https://github.com/noraheaphy/GIS-workshop-2026/blob/main/pics/DR_model.png)
 
 ---------------------------------------------------------------------------
 
