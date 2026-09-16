@@ -34,6 +34,8 @@ str(BS_range)
 
 ```
 
+![Black spruce range]([https://github.com/noraheaphy/GIS-workshop-2026/blob/main/pics/BS_range.png])
+
 Important: You need to know existing CRS here when turning the dataframe into a spatial object--this is what projection the data is already in, not what projection you want it to be in. Also, note that longitude is x, and latitutde is y. The CRS in this command can be set equal to an EPSG code (4326) or a PROJ string, which looks something like: `+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0`
 
 More info here: <https://inbo.github.io/tutorials/tutorials/spatial_crs_coding/>
